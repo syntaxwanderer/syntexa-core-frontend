@@ -15,6 +15,14 @@ class TwigFactory
 {
     private static ?TwigEnvironment $twig = null;
 
+    /**
+     * Reset Twig instance (useful for testing or after module registration)
+     */
+    public static function reset(): void
+    {
+        self::$twig = null;
+    }
+
     public static function get(): TwigEnvironment
     {
         if (self::$twig instanceof TwigEnvironment) {
@@ -80,7 +88,8 @@ class TwigFactory
 
     private static function discoverProjectLayoutPaths(): array
     {
-        $root = dirname(__DIR__, 5) . '/src/modules';
+        $projectRoot = self::getProjectRoot();
+        $root = $projectRoot . '/src/modules';
         if (!is_dir($root)) {
             return [];
         }
@@ -93,6 +102,47 @@ class TwigFactory
         }
 
         return $paths;
+    }
+
+    private static function getProjectRoot(): string
+    {
+        static $root = null;
+        if ($root !== null) {
+            return $root;
+        }
+
+        // Calculate project root: from packages/syntexa/core-frontend/src/View go up
+        // In container, file is at /var/www/packages/syntexa/core-frontend/src/View/TwigFactory.php
+        // Going up 6 levels gives us /var/www, then we need to add /html
+        $calculatedRoot = dirname(__FILE__, 6);
+        // If we're in /var/www, add /html to get /var/www/html
+        if ($calculatedRoot === '/var/www' || str_ends_with($calculatedRoot, '/www')) {
+            $calculatedRoot = '/var/www/html';
+        }
+        
+        // Verify it's actually a project root
+        if (is_file($calculatedRoot . '/composer.json') && is_dir($calculatedRoot . '/src/modules')) {
+            $root = $calculatedRoot;
+            return $root;
+        }
+
+        // Fallback: try walking up from current directory
+        $dir = __DIR__;
+        while ($dir !== '/' && $dir !== '') {
+            if (is_file($dir . '/composer.json') && is_dir($dir . '/src/modules')) {
+                $root = $dir;
+                return $root;
+            }
+            $parent = dirname($dir);
+            if ($parent === $dir) {
+                break;
+            }
+            $dir = $parent;
+        }
+
+        // Last resort: use calculated root anyway
+        $root = $calculatedRoot;
+        return $root;
     }
 
     private static function layoutAlias(string $module): string
