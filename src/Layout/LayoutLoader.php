@@ -92,6 +92,7 @@ class LayoutLoader
 
     /**
      * Project root (where composer.json and src/modules/ live). Public so TwigFactory can use the same root for namespace resolution.
+     * Does not rely on fixed path depth so it works for both vendor/syntexa/core-frontend and vendor/syntexa/module-core-frontend.
      */
     public static function getProjectRoot(): string
     {
@@ -100,22 +101,20 @@ class LayoutLoader
             return $root;
         }
 
-        // Calculate project root: from packages/syntexa/core-frontend/src/Layout go up
-        // In container, file is at /var/www/packages/syntexa/core-frontend/src/Layout/LayoutLoader.php
-        // Going up 6 levels gives us /var/www, then we need to add /html
-        $calculatedRoot = dirname(__FILE__, 6);
-        // If we're in /var/www, add /html to get /var/www/html
-        if ($calculatedRoot === '/var/www' || str_ends_with($calculatedRoot, '/www')) {
-            $calculatedRoot = '/var/www/html';
+        // 1. Try known roots (Docker app at /var/www/html, or CWD when running from project)
+        $candidates = ['/var/www/html'];
+        $cwd = getcwd();
+        if ($cwd !== false && $cwd !== '') {
+            $candidates[] = $cwd;
         }
-        
-        // Verify it's actually a project root
-        if (is_file($calculatedRoot . '/composer.json') && is_dir($calculatedRoot . '/src/modules')) {
-            $root = $calculatedRoot;
-            return $root;
+        foreach ($candidates as $dir) {
+            if (is_file($dir . '/composer.json') && is_dir($dir . '/src/modules')) {
+                $root = $dir;
+                return $root;
+            }
         }
 
-        // Fallback: try walking up from current directory
+        // 2. Walk up from this file until we find composer.json + src/modules (works for any vendor path depth)
         $dir = __DIR__;
         while ($dir !== '/' && $dir !== '') {
             if (is_file($dir . '/composer.json') && is_dir($dir . '/src/modules')) {
@@ -129,8 +128,8 @@ class LayoutLoader
             $dir = $parent;
         }
 
-        // Last resort: use calculated root anyway
-        $root = $calculatedRoot;
+        // Last resort: /var/www/html for Docker
+        $root = '/var/www/html';
         return $root;
     }
 }
