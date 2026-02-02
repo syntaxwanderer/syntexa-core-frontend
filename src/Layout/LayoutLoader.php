@@ -24,25 +24,65 @@ class LayoutLoader
 
     private static function findProjectLayout(string $handle): ?array
     {
-        $root = self::getProjectRoot() . '/src/modules';
-        $pattern = $root . '/*/Layout/' . $handle . '.html.twig';
-        $matches = glob($pattern, GLOB_NOSORT) ?: [];
-        if (empty($matches)) {
+        $modulesRoot = self::getProjectRoot() . '/src/modules';
+        if (!is_dir($modulesRoot)) {
             return null;
         }
 
-        sort($matches);
+        $moduleDirs = glob($modulesRoot . '/*', GLOB_ONLYDIR) ?: [];
+        foreach ($moduleDirs as $moduleDir) {
+            $module = basename($moduleDir);
 
-        $path = $matches[0];
-        $module = basename(dirname(dirname($path)));
-        $alias = self::aliasForModule($module);
-        $template = "@{$alias}/" . basename($path);
+            // 1. Primary: Standard Module Layout — Application/View/templates/
+            $templatesDir = $moduleDir . '/src/Application/View/templates';
+            if (is_dir($templatesDir)) {
+                $found = self::findTemplateInDir($templatesDir, $handle);
+                if ($found !== null) {
+                    [$path, $relativePath] = $found;
+                    $alias = self::aliasForModule($module);
+                    return [
+                        'template' => "@{$alias}/" . $relativePath,
+                        'module' => $module,
+                        'path' => $path,
+                    ];
+                }
+            }
 
-        return [
-            'template' => $template,
-            'module' => $module,
-            'path' => $path,
-        ];
+            // 2. Fallback: legacy Layout/ at module root (backward compatibility)
+            $layoutFile = $moduleDir . '/Layout/' . $handle . '.html.twig';
+            if (is_file($layoutFile)) {
+                $alias = self::aliasForModule($module);
+                return [
+                    'template' => "@{$alias}/" . basename($layoutFile),
+                    'module' => $module,
+                    'path' => $layoutFile,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Look for {handle}.html.twig in directory, then in any subdirectory (one level: category/).
+     *
+     * @return array{0: string, 1: string}|null [fullPath, relativePath] or null
+     */
+    private static function findTemplateInDir(string $dir, string $handle): ?array
+    {
+        $direct = $dir . '/' . $handle . '.html.twig';
+        if (is_file($direct)) {
+            return [$direct, $handle . '.html.twig'];
+        }
+        $subdirs = glob($dir . '/*', GLOB_ONLYDIR) ?: [];
+        foreach ($subdirs as $subdir) {
+            $file = $subdir . '/' . $handle . '.html.twig';
+            if (is_file($file)) {
+                $relativePath = basename($subdir) . '/' . $handle . '.html.twig';
+                return [$file, $relativePath];
+            }
+        }
+        return null;
     }
 
     private static function aliasForModule(string $module): string

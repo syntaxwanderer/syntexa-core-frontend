@@ -86,19 +86,31 @@ class TwigFactory
         return $root . '/var/cache/twig';
     }
 
+    /**
+     * Discover template paths per module for Twig alias project-layouts-{Module}.
+     * Prefer Standard Module Layout: Application/View/templates/; fallback to legacy Layout/ at module root.
+     */
     private static function discoverProjectLayoutPaths(): array
     {
         $projectRoot = self::getProjectRoot();
-        $root = $projectRoot . '/src/modules';
-        if (!is_dir($root)) {
+        $modulesRoot = $projectRoot . '/src/modules';
+        if (!is_dir($modulesRoot)) {
             return [];
         }
 
         $paths = [];
-        $modules = glob($root . '/*/Layout', GLOB_ONLYDIR) ?: [];
-        foreach ($modules as $layoutDir) {
-            $module = basename(dirname($layoutDir));
-            $paths[$module] = $layoutDir;
+        $moduleDirs = glob($modulesRoot . '/*', GLOB_ONLYDIR) ?: [];
+        foreach ($moduleDirs as $moduleDir) {
+            $module = basename($moduleDir);
+            $templatesDir = $moduleDir . '/src/Application/View/templates';
+            if (is_dir($templatesDir)) {
+                $paths[$module] = $templatesDir;
+            } else {
+                $layoutDir = $moduleDir . '/Layout';
+                if (is_dir($layoutDir)) {
+                    $paths[$module] = $layoutDir;
+                }
+            }
         }
 
         return $paths;
