@@ -65,7 +65,7 @@ class TwigFactory
             $loader->addPath($path, self::layoutAlias($module));
         }
 
-        $cacheDir = self::getCacheDir();
+        $cacheDir = self::getWritableCacheDir();
         if (!is_dir($cacheDir)) {
             @mkdir($cacheDir, 0777, true);
         }
@@ -87,6 +87,25 @@ class TwigFactory
     }
 
     /**
+     * Return a Twig cache directory that is writable (project var/cache/twig or fallback to system temp).
+     */
+    private static function getWritableCacheDir(): string
+    {
+        $cacheDir = self::getCacheDir();
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0777, true);
+        }
+        if (is_dir($cacheDir) && is_writable($cacheDir)) {
+            return $cacheDir;
+        }
+        $fallback = sys_get_temp_dir() . '/semitexa-twig-cache';
+        if (!is_dir($fallback)) {
+            @mkdir($fallback, 0777, true);
+        }
+        return $fallback;
+    }
+
+    /**
      * Discover template paths per module for Twig alias project-layouts-{Module}.
      * When Application/View/templates/ exists (Standard Module Layout), use it.
      * When both Application/View/templates/ and Layout/ exist, use Application/View/templates/ so that
@@ -105,7 +124,7 @@ class TwigFactory
         $moduleDirs = glob($modulesRoot . '/*', GLOB_ONLYDIR) ?: [];
         foreach ($moduleDirs as $moduleDir) {
             $module = basename($moduleDir);
-            $templatesDir = $moduleDir . '/src/Application/View/templates';
+            $templatesDir = $moduleDir . '/Application/View/templates';
             $layoutDir = $moduleDir . '/Layout';
 
             // Prefer Application/View/templates/ when it exists (including when both exist)

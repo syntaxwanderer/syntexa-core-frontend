@@ -33,8 +33,8 @@ class LayoutLoader
         foreach ($moduleDirs as $moduleDir) {
             $module = basename($moduleDir);
 
-            // 1. Primary: Standard Module Layout — Application/View/templates/
-            $templatesDir = $moduleDir . '/src/Application/View/templates';
+            // 1. Primary: Standard Module Layout — Application/View/templates/ (PSR-4: no inner src/)
+            $templatesDir = $moduleDir . '/Application/View/templates';
             if (is_dir($templatesDir)) {
                 $found = self::findTemplateInDir($templatesDir, $handle);
                 if ($found !== null) {
